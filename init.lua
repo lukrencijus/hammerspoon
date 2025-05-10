@@ -31,19 +31,37 @@
 -- end)
 
 
-hs.hotkey.bind({"cmd", "alt"}, "tab", function()
-  hs.hints.windowHints()
-end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 hs.hotkey.bind({"cmd", "alt"}, "A", function()
   local apps = hs.application.runningApplications()
   local choices = {}
   for _, app in ipairs(apps) do
-    -- Only include regular GUI apps with a bundle ID and name
-    if app:kind() == 1 and app:bundleID() and app:name() and app:name() ~= "loginwindow" then
+    local name = app:name()
+    local bundleID = app:bundleID()
+    -- Exclude system apps (bundleID starts with "com.apple.") and apps without a name
+    if name and bundleID and not bundleID:find("^com%.apple%.") then
       table.insert(choices, {
-        text = app:name(),
-        subText = app:bundleID(),
+        text = name,
+        subText = bundleID,
         app = app
       })
     end
@@ -68,6 +86,3 @@ hs.hotkey.bind({"cmd", "alt"}, "A", function()
   chooser:choices(uniqueChoices)
   chooser:show()
 end)
-
-
-
