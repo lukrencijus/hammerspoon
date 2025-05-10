@@ -1,57 +1,5 @@
--- -- Create the menubar item
--- local spotifyMenubar = hs.menubar.new()
-
--- -- Function to update the menubar icon
--- function updateSpotifyArtwork()
---     if hs.spotify.isRunning() and hs.spotify.isPlaying() then
---         local url = hs.spotify.getCurrentTrackArtworkURL()
---         if url then
---             local img = hs.image.imageFromURL(url)
---             if img then
---                 -- Resize image for menubar (e.g., 22x22)
---                 img = img:setSize({w=22, h=22})
---                 spotifyMenubar:setIcon(img)
---                 spotifyMenubar:setTitle("") -- Remove any text
---                 return
---             end
---         end
---     end
---     -- If not playing, show a default icon or clear
---     spotifyMenubar:setIcon(nil)
---     spotifyMenubar:setTitle("🎵")
--- end
-
--- -- Update every 5 seconds
--- local spotifyTimer = hs.timer.doEvery(5, updateSpotifyArtwork)
--- updateSpotifyArtwork() -- Initial call
-
--- -- Open or focus Spotify when clicked
--- spotifyMenubar:setClickCallback(function()
---     hs.application.launchOrFocus("Spotify")
--- end)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-hs.hotkey.bind({"cmd", "alt"}, "A", function()
+-- Better Force Quit Applications (including background apps and with search functionality)
+hs.hotkey.bind({"cmd", "alt"}, "§", function()
   local apps = hs.application.runningApplications()
   local choices = {}
   for _, app in ipairs(apps) do
@@ -62,7 +10,8 @@ hs.hotkey.bind({"cmd", "alt"}, "A", function()
         table.insert(choices, {
           text = name,
           subText = bundleID,
-          app = app
+          app = app,
+          image = hs.image.imageFromAppBundle(bundleID)
         })
       end
     else
@@ -70,7 +19,8 @@ hs.hotkey.bind({"cmd", "alt"}, "A", function()
         table.insert(choices, {
           text = name,
           subText = bundleID,
-          app = app
+          app = app,
+          image = hs.image.imageFromAppBundle(bundleID)
         })
       end
     end
