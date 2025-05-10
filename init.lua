@@ -57,17 +57,25 @@ hs.hotkey.bind({"cmd", "alt"}, "A", function()
   for _, app in ipairs(apps) do
     local name = app:name()
     local bundleID = app:bundleID()
-    -- Exclude system apps (bundleID starts with "com.apple.") and apps without a name
-    if name and bundleID and not bundleID:find("^com%.apple%.") then
-      table.insert(choices, {
-        text = name,
-        subText = bundleID,
-        app = app
-      })
+    if app:kind() == 1 then
+      if name and bundleID then
+        table.insert(choices, {
+          text = name,
+          subText = bundleID,
+          app = app
+        })
+      end
+    else
+      if name and bundleID and not bundleID:find("^com%.apple%.") then
+        table.insert(choices, {
+          text = name,
+          subText = bundleID,
+          app = app
+        })
+      end
     end
   end
 
-  -- Remove duplicates by app name
   local seen = {}
   local uniqueChoices = {}
   for _, choice in ipairs(choices) do
