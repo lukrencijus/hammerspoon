@@ -1,4 +1,6 @@
--- Better Force Quit Applications (including background apps and with search functionality)
+-- ==========================
+-- Better Force Quit Applications (with background apps and search functionality)
+-- ==========================
 hs.hotkey.bind({"cmd", "alt"}, "`", function()
   local apps = hs.application.runningApplications()
   local choices = {}
@@ -47,8 +49,9 @@ end)
 
 
 
-
--- Spotify in menu bar (artist and song names with media controls when clicked)
+-- ==========================
+-- Spotify in menu bar (artist and song names and media controls when clicked)
+-- ==========================
 local spotify = {}
 local menubar = nil
 local timer = nil
@@ -291,4 +294,72 @@ hs.shutdownCallback = spotify.cleanup
 
 spotify.init()
 
-return spotify
+
+
+-- ==========================
+-- Unsplash Daily Wallpaper
+-- ==========================
+
+local ACCESS_KEY = "YOUR_UNSPLASH_ACCESS_KEY"
+
+local wallpaperTimer = nil
+local currentTask = nil
+
+local function setWallpaperFromURL(url)
+    if currentTask then
+        currentTask:terminate()
+        currentTask = nil
+    end
+
+    local tmpPath = os.tmpname() .. ".jpg"
+    print("Saving wallpaper temp file at:", tmpPath)
+
+    currentTask = hs.task.new(
+        "/usr/bin/curl",
+        function(exitCode, stdOut, stdErr)
+            if exitCode == 0 then
+                -- Apply wallpaper
+                hs.screen.mainScreen():desktopImageURL("file://" .. tmpPath)
+                print("Wallpaper updated ✅ " .. tmpPath)
+
+                -- Delete file a few seconds later (let macOS latch)
+                hs.timer.doAfter(5, function()
+                    os.remove(tmpPath)
+                    os.remove(tmpPath:gsub("%.jpg$", ""))
+                    print("Temp files deleted 🗑️")
+                end)
+            else
+                print("curl failed:", stdErr)
+            end
+        end,
+        { "-L", url, "-o", tmpPath }
+    )
+    currentTask:start()
+end
+
+local function fetchRandomFromUnsplash()
+    local http = require("hs.http")
+    local apiUrl =
+        "https://api.unsplash.com/photos/random?client_id="
+        .. ACCESS_KEY
+        .. "&orientation=landscape&query=abstract-dark"
+
+    http.asyncGet(apiUrl, nil, function(status, body, headers)
+        if status == 200 then
+            local data = hs.json.decode(body)
+            if data and data.urls and data.urls.full then
+                print("Fetched random image:", data.urls.full)
+                setWallpaperFromURL(data.urls.full)
+            else
+                print("Error: Unexpected Unsplash API response")
+            end
+        else
+            print("Unsplash API error:", status, body)
+        end
+    end)
+end
+
+-- Run daily at 3:00 AM
+hs.timer.doAt("03:00", 24*60*60, fetchRandomFromUnsplash)
+
+hs.hotkey.bind({"cmd", "alt"}, "W", fetchRandomFromUnsplash)
