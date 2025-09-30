@@ -299,67 +299,96 @@ spotify.init()
 -- ==========================
 -- Unsplash Daily Wallpaper
 -- ==========================
+local ACCESS_KEY = "ACCESS_KEY"
 
-local ACCESS_KEY = "YOUR_UNSPLASH_ACCESS_KEY"
-
-local wallpaperTimer = nil
 local currentTask = nil
+local lastChangeTime = 0
 
 local function setWallpaperFromURL(url)
-    if currentTask then
-        currentTask:terminate()
-        currentTask = nil
+  if currentTask then
+    currentTask:terminate()
+    currentTask = nil
+  end
+
+  local tmpPath = os.tmpname() .. ".jpg"
+  print("Saving wallpaper temp file at:", tmpPath)
+
+  currentTask = hs.task.new("/usr/bin/curl", function(
+    exitCode,
+    stdOut,
+    stdErr
+  )
+    if exitCode == 0 then
+      -- Apply to all screens
+      for _, screen in pairs(hs.screen.allScreens()) do
+        screen:desktopImageURL("file://" .. tmpPath)
+        print("Wallpaper updated on " .. screen:name() .. " ✅")
+      end
+
+      hs.timer.doAfter(5, function()
+        os.remove(tmpPath)
+        os.remove(tmpPath:gsub("%.jpg$", ""))
+        print("Temp files deleted 🗑️")
+      end)
+    else
+      print("curl failed:", stdErr)
     end
-
-    local tmpPath = os.tmpname() .. ".jpg"
-    print("Saving wallpaper temp file at:", tmpPath)
-
-    currentTask = hs.task.new(
-        "/usr/bin/curl",
-        function(exitCode, stdOut, stdErr)
-            if exitCode == 0 then
-                -- Apply wallpaper
-                hs.screen.mainScreen():desktopImageURL("file://" .. tmpPath)
-                print("Wallpaper updated ✅ " .. tmpPath)
-
-                -- Delete file a few seconds later (let macOS latch)
-                hs.timer.doAfter(5, function()
-                    os.remove(tmpPath)
-                    os.remove(tmpPath:gsub("%.jpg$", ""))
-                    print("Temp files deleted 🗑️")
-                end)
-            else
-                print("curl failed:", stdErr)
-            end
-        end,
-        { "-L", url, "-o", tmpPath }
-    )
-    currentTask:start()
+  end, { "-L", url, "-o", tmpPath })
+  currentTask:start()
 end
 
 local function fetchRandomFromUnsplash()
-    local http = require("hs.http")
-    local apiUrl =
-        "https://api.unsplash.com/photos/random?client_id="
-        .. ACCESS_KEY
-        .. "&orientation=landscape&query=abstract-dark"
+  local http = require("hs.http")
 
-    http.asyncGet(apiUrl, nil, function(status, body, headers)
-        if status == 200 then
-            local data = hs.json.decode(body)
-            if data and data.urls and data.urls.full then
-                print("Fetched random image:", data.urls.full)
-                setWallpaperFromURL(data.urls.full)
-            else
-                print("Error: Unexpected Unsplash API response")
-            end
-        else
-            print("Unsplash API error:", status, body)
-        end
-    end)
+  local apiUrl = "https://api.unsplash.com/photos/random?client_id="
+    .. ACCESS_KEY
+    .. "&collections=1065976,317099,1459961,7282015"
+    .. "&orientation=landscape"
+
+  http.asyncGet(apiUrl, nil, function(status, body, headers)
+    if status == 200 then
+      local data = hs.json.decode(body)
+      if data and data.urls and data.urls.full then
+        print("Fetched random image:", data.urls.full)
+        setWallpaperFromURL(data.urls.full)
+        lastChangeTime = os.time()
+      else
+        print("Error: Unexpected Unsplash API response")
+      end
+    else
+      print("Unsplash API error:", status, body)
+    end
+  end)
 end
 
--- Run daily at 3:00 AM
-hs.timer.doAt("03:00", 24*60*60, fetchRandomFromUnsplash)
+local function checkAndUpdateWallpaper()
+  local currentTime = os.time()
+  local hoursSinceLastChange = (currentTime - lastChangeTime) / 3600
 
-hs.hotkey.bind({"cmd", "alt"}, "W", fetchRandomFromUnsplash)
+  if hoursSinceLastChange >= 20 then
+    print("20 hours passed, updating wallpaper...")
+    fetchRandomFromUnsplash()
+  else
+    print(
+      string.format(
+        "Only %.1f hours since last change, skipping...",
+        hoursSinceLastChange
+      )
+    )
+  end
+end
+
+-- Check every hour
+hs.timer.doEvery(60 * 60, checkAndUpdateWallpaper)
+
+-- Check on wake (but won't update unless 20h passed)
+hs.caffeinate.watcher
+  .new(function(event)
+    if event == hs.caffeinate.watcher.systemDidWake then
+      checkAndUpdateWallpaper()
+    end
+  end)
+  :start()
+
+-- Manual trigger (bypasses the timer)
+hs.hotkey.bind({ "cmd", "alt" }, "W", fetchRandomFromUnsplash)
