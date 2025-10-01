@@ -299,7 +299,7 @@ spotify.init()
 -- ==========================
 -- Unsplash Daily Wallpaper
 -- ==========================
-local ACCESS_KEY = "ACCESS_KEY"
+local ACCESS_KEY = "Axj4KOYrIzX2r67ymh4U4jKb0RU2g6yjSH6xLg4PHlU"
 
 local currentTask = nil
 local lastChangeTime = 0
@@ -319,7 +319,6 @@ local function setWallpaperFromURL(url)
     stdErr
   )
     if exitCode == 0 then
-      -- Apply to all screens
       for _, screen in pairs(hs.screen.allScreens()) do
         screen:desktopImageURL("file://" .. tmpPath)
         print("Wallpaper updated on " .. screen:name() .. " ✅")
@@ -352,6 +351,10 @@ local function fetchRandomFromUnsplash()
         print("Fetched random image:", data.urls.full)
         setWallpaperFromURL(data.urls.full)
         lastChangeTime = os.time()
+        print("Updated lastChangeTime to:", lastChangeTime)
+        
+        -- Schedule next check
+        scheduleNextCheck()
       else
         print("Error: Unexpected Unsplash API response")
       end
@@ -365,8 +368,15 @@ local function checkAndUpdateWallpaper()
   local currentTime = os.time()
   local hoursSinceLastChange = (currentTime - lastChangeTime) / 3600
 
+  print(
+    string.format(
+      "⏰ Check triggered - %.1f hours since last change",
+      hoursSinceLastChange
+    )
+  )
+
   if hoursSinceLastChange >= 20 then
-    print("20 hours passed, updating wallpaper...")
+    print("20+ hours passed, updating wallpaper...")
     fetchRandomFromUnsplash()
   else
     print(
@@ -375,20 +385,33 @@ local function checkAndUpdateWallpaper()
         hoursSinceLastChange
       )
     )
+    -- Schedule next check even if we skip
+    scheduleNextCheck()
   end
 end
 
--- Check every hour
-hs.timer.doEvery(60 * 60, checkAndUpdateWallpaper)
+-- Use delayed timer that reschedules itself
+local nextCheckTimer = nil
 
--- Check on wake (but won't update unless 20h passed)
-hs.caffeinate.watcher
-  .new(function(event)
-    if event == hs.caffeinate.watcher.systemDidWake then
-      checkAndUpdateWallpaper()
-    end
+function scheduleNextCheck()
+  if nextCheckTimer then
+    nextCheckTimer:stop()
+  end
+  
+  print("📅 Scheduling next check in 1 hour...")
+  nextCheckTimer = hs.timer.doAfter(60 * 60, function()
+    checkAndUpdateWallpaper()
   end)
-  :start()
+end
 
--- Manual trigger (bypasses the timer)
-hs.hotkey.bind({ "cmd", "alt" }, "W", fetchRandomFromUnsplash)
+-- Start the chain
+scheduleNextCheck()
+
+-- Manual trigger
+hs.hotkey.bind({ "cmd", "alt" }, "W", function()
+  print("🔥 Manual trigger pressed")
+  fetchRandomFromUnsplash()
+end)
+
+print("📸 Wallpaper module loaded")
+print("Initial lastChangeTime:", lastChangeTime)
