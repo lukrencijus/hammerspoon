@@ -299,7 +299,7 @@ spotify.init()
 -- ==========================
 -- Unsplash Daily Wallpaper
 -- ==========================
-local ACCESS_KEY = "Axj4KOYrIzX2r67ymh4U4jKb0RU2g6yjSH6xLg4PHlU"
+local ACCESS_KEY = "ACCESS_KEY"
 
 local currentTask = nil
 local lastChangeTime = 0
