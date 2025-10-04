@@ -321,7 +321,7 @@ local function setWallpaperFromURL(url)
     if exitCode == 0 then
       for _, screen in pairs(hs.screen.allScreens()) do
         screen:desktopImageURL("file://" .. tmpPath)
-        print("Wallpaper updated on " .. screen:name() .. " ✅")
+        print("Wallpaper updated on " .. screen:name())
       end
 
       hs.timer.doAfter(5, function()
@@ -353,7 +353,6 @@ local function fetchRandomFromUnsplash()
         lastChangeTime = os.time()
         print("Updated lastChangeTime to:", lastChangeTime)
         
-        -- Schedule next check
         scheduleNextCheck()
       else
         print("Error: Unexpected Unsplash API response")
@@ -370,27 +369,20 @@ local function checkAndUpdateWallpaper()
 
   print(
     string.format(
-      "⏰ Check triggered - %.1f hours since last change",
+      "Check triggered - %.1f hours since last change...",
       hoursSinceLastChange
     )
   )
 
   if hoursSinceLastChange >= 20 then
-    print("20+ hours passed, updating wallpaper...")
+    print("20+ hours passed, updating wallpaper")
     fetchRandomFromUnsplash()
   else
-    print(
-      string.format(
-        "Only %.1f hours since last change, skipping...",
-        hoursSinceLastChange
-      )
-    )
-    -- Schedule next check even if we skip
+    print("Skipping, scheduling next check...")
     scheduleNextCheck()
   end
 end
 
--- Use delayed timer that reschedules itself
 local nextCheckTimer = nil
 
 function scheduleNextCheck()
@@ -398,20 +390,10 @@ function scheduleNextCheck()
     nextCheckTimer:stop()
   end
   
-  print("📅 Scheduling next check in 1 hour...")
-  nextCheckTimer = hs.timer.doAfter(60 * 60, function()
+  print("Scheduling next check in 10 minutes")
+  nextCheckTimer = hs.timer.doAfter(10 * 60, function()
     checkAndUpdateWallpaper()
   end)
 end
 
--- Start the chain
 scheduleNextCheck()
-
--- Manual trigger
-hs.hotkey.bind({ "cmd", "alt" }, "W", function()
-  print("🔥 Manual trigger pressed")
-  fetchRandomFromUnsplash()
-end)
-
-print("📸 Wallpaper module loaded")
-print("Initial lastChangeTime:", lastChangeTime)
