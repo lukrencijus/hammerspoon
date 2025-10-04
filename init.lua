@@ -299,7 +299,7 @@ spotify.init()
 -- ==========================
 -- Unsplash Daily Wallpaper
 -- ==========================
-local ACCESS_KEY = "ACCESS_KEY"
+local ACCESS_KEY = "YOUR_API_KEY_HERE"
 
 local currentTask = nil
 local lastChangeTime = 0
@@ -311,7 +311,6 @@ local function setWallpaperFromURL(url)
   end
 
   local tmpPath = os.tmpname() .. ".jpg"
-  print("Saving wallpaper temp file at:", tmpPath)
 
   currentTask = hs.task.new("/usr/bin/curl", function(
     exitCode,
@@ -321,16 +320,12 @@ local function setWallpaperFromURL(url)
     if exitCode == 0 then
       for _, screen in pairs(hs.screen.allScreens()) do
         screen:desktopImageURL("file://" .. tmpPath)
-        print("Wallpaper updated on " .. screen:name())
       end
 
       hs.timer.doAfter(5, function()
         os.remove(tmpPath)
         os.remove(tmpPath:gsub("%.jpg$", ""))
-        print("Temp files deleted 🗑️")
       end)
-    else
-      print("curl failed:", stdErr)
     end
   end, { "-L", url, "-o", tmpPath })
   currentTask:start()
@@ -344,21 +339,14 @@ local function fetchRandomFromUnsplash()
     .. "&collections=1065976,317099,1459961,7282015"
     .. "&orientation=landscape"
 
-  http.asyncGet(apiUrl, nil, function(status, body, headers)
+  http.asyncGet(apiUrl, nil, function(status, body)
     if status == 200 then
       local data = hs.json.decode(body)
       if data and data.urls and data.urls.full then
-        print("Fetched random image:", data.urls.full)
         setWallpaperFromURL(data.urls.full)
         lastChangeTime = os.time()
-        print("Updated lastChangeTime to:", lastChangeTime)
-        
         scheduleNextCheck()
-      else
-        print("Error: Unexpected Unsplash API response")
       end
-    else
-      print("Unsplash API error:", status, body)
     end
   end)
 end
@@ -367,18 +355,9 @@ local function checkAndUpdateWallpaper()
   local currentTime = os.time()
   local hoursSinceLastChange = (currentTime - lastChangeTime) / 3600
 
-  print(
-    string.format(
-      "Check triggered - %.1f hours since last change...",
-      hoursSinceLastChange
-    )
-  )
-
   if hoursSinceLastChange >= 20 then
-    print("20+ hours passed, updating wallpaper")
     fetchRandomFromUnsplash()
   else
-    print("Skipping, scheduling next check...")
     scheduleNextCheck()
   end
 end
@@ -389,11 +368,8 @@ function scheduleNextCheck()
   if nextCheckTimer then
     nextCheckTimer:stop()
   end
-  
-  print("Scheduling next check in 10 minutes")
-  nextCheckTimer = hs.timer.doAfter(10 * 60, function()
-    checkAndUpdateWallpaper()
-  end)
+
+  nextCheckTimer = hs.timer.doAfter(60, checkAndUpdateWallpaper)
 end
 
 scheduleNextCheck()
