@@ -299,7 +299,7 @@ spotify.init()
 -- ==========================
 -- Unsplash Daily Wallpaper
 -- ==========================
-local ACCESS_KEY = "YOUR_API_KEY_HERE"
+local ACCESS_KEY = "YpVW2DPaq0SziEo0ZHcqTDDiU860wAf9GmalZmIDkqk"
 
 local currentTask = nil
 local lastChangeTime = 0
@@ -373,3 +373,84 @@ function scheduleNextCheck()
 end
 
 scheduleNextCheck()
+
+
+-- ==========================
+-- Automatically switch focus to the next available window when a window is minimized
+-- ==========================
+-- Watch for window minimization events
+local wf = hs.window.filter.new()
+wf:subscribe(hs.window.filter.windowMinimized, function()
+    local nextWindow = hs.window.focusedWindow()
+    -- If there is no focused window, or the focus is stuck on the minimized window
+    if not nextWindow or nextWindow:isMinimized() then
+        -- Retrieve all open windows ordered by most recently focused
+        local windows = hs.window.orderedWindows()
+        for _, w in ipairs(windows) do
+            if w:isVisible() and not w:isMinimized() then
+                w:focus() -- Switch focus to the next available window
+                break
+            end
+        end
+    end
+end)
+
+
+
+-- ==========================
+-- Menu bar loading indicator for app launches
+-- ==========================
+-- Table to track active app launches
+local activeLaunches = {}
+local launchMenu = nil
+
+-- Update the menu bar status based on currently launching apps
+local function updateMenuBar()
+    -- Get the most recent app currently launching
+    local currentApp = nil
+    for app, _ in pairs(activeLaunches) do
+        currentApp = app
+        break -- Show the first one in the queue
+    end
+
+    if currentApp then
+        -- Create the menu bar item if it doesn't exist
+        if not launchMenu then
+            launchMenu = hs.menubar.new()
+        end
+        -- Display a loading emoji and the app name in the menu bar
+        launchMenu:setTitle("⏳ " .. currentApp)
+        launchMenu:setTooltip("Launching " .. currentApp)
+    else
+        -- Clean up and remove the menu bar item when nothing is loading
+        if launchMenu then
+            launchMenu:delete()
+            launchMenu = nil
+        end
+    end
+end
+
+-- Monitor system-wide workspace launch events
+local function appWatcherCallback(appName, eventType, appObject)
+    if eventType == hs.application.watcher.launching then
+        activeLaunches[appName] = true
+        updateMenuBar()
+        
+        -- Fail-safe: Automatically clear the loader after 8 seconds 
+        -- in case the app loads silently in the background or fails to report "launched"
+        hs.timer.doAfter(8, function()
+            if activeLaunches[appName] then
+                activeLaunches[appName] = nil
+                updateMenuBar()
+            end
+        end)
+        
+    elseif eventType == hs.application.watcher.launched then
+        activeLaunches[appName] = nil
+        updateMenuBar()
+    end
+end
+
+-- Global variable reference to prevent garbage collection
+globalAppWatcher = hs.application.watcher.new(appWatcherCallback)
+globalAppWatcher:start()
