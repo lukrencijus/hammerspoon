@@ -95,7 +95,6 @@ function spotify.isSpotifyRunning()
     if success then
         return result
     else
-        print("Error checking Spotify status: " .. tostring(result))
         return false
     end
 end
@@ -219,7 +218,6 @@ function spotify.updateMenuBarDisplay()
         if not spotify.isSpotifyRunning() and not spotify.isSpotifyRunningAlternative() then
             if menubar and menubar:isInMenuBar() then
                 menubar:removeFromMenuBar()
-                print("Spotify not running - hiding menu bar item")
             end
             lastTrackInfo = nil
             return
@@ -229,7 +227,6 @@ function spotify.updateMenuBarDisplay()
         if not track then
             if menubar and menubar:isInMenuBar() then
                 menubar:removeFromMenuBar()
-                print("No track info available - hiding menu bar item")
             end
             lastTrackInfo = nil
             return
@@ -243,7 +240,6 @@ function spotify.updateMenuBarDisplay()
         
         if not menubar:isInMenuBar() then
             menubar:returnToMenuBar()
-            print("Showing menu bar item for: " .. track.artist .. " - " .. track.title)
         end
         
         local displayText = track.artist .. " - " .. track.title
@@ -257,7 +253,6 @@ function spotify.updateMenuBarDisplay()
     end)
     
     if not success then
-        print("Error updating menu bar display: " .. tostring(error))
     end
 end
 
@@ -287,7 +282,6 @@ end
 
 function spotify.cleanup()
     spotify.stop()
-    print("Spotify menu bar integration stopped")
 end
 
 hs.shutdownCallback = spotify.cleanup
@@ -375,6 +369,7 @@ end
 scheduleNextCheck()
 
 
+
 -- ==========================
 -- Automatically switch focus to the next available window when a window is minimized
 -- ==========================
@@ -400,29 +395,24 @@ end)
 -- ==========================
 -- Menu bar loading indicator for app launches
 -- ==========================
--- Table to track active app launches
 local activeLaunches = {}
 local launchMenu = nil
+local launchTimers = {}
 
--- Update the menu bar status based on currently launching apps
 local function updateMenuBar()
-    -- Get the most recent app currently launching
     local currentApp = nil
     for app, _ in pairs(activeLaunches) do
         currentApp = app
-        break -- Show the first one in the queue
+        break
     end
 
     if currentApp then
-        -- Create the menu bar item if it doesn't exist
         if not launchMenu then
             launchMenu = hs.menubar.new()
         end
-        -- Display a loading emoji and the app name in the menu bar
         launchMenu:setTitle("⏳ " .. currentApp)
         launchMenu:setTooltip("Launching " .. currentApp)
     else
-        -- Clean up and remove the menu bar item when nothing is loading
         if launchMenu then
             launchMenu:delete()
             launchMenu = nil
@@ -430,27 +420,78 @@ local function updateMenuBar()
     end
 end
 
--- Monitor system-wide workspace launch events
-local function appWatcherCallback(appName, eventType, appObject)
-    if eventType == hs.application.watcher.launching then
-        activeLaunches[appName] = true
-        updateMenuBar()
-        
-        -- Fail-safe: Automatically clear the loader after 8 seconds 
-        -- in case the app loads silently in the background or fails to report "launched"
-        hs.timer.doAfter(8, function()
-            if activeLaunches[appName] then
-                activeLaunches[appName] = nil
-                updateMenuBar()
-            end
-        end)
-        
-    elseif eventType == hs.application.watcher.launched then
-        activeLaunches[appName] = nil
-        updateMenuBar()
+local function clearLaunch(appName)
+    activeLaunches[appName] = nil
+    if launchTimers[appName] then
+        launchTimers[appName]:stop()
+        launchTimers[appName] = nil
+    end
+    updateMenuBar()
+end
+
+local helperPatterns = {
+    "WebView", "Helper", "Renderer", "Agent",
+    "Daemon", "Service", "Extension", "Plugin"
+}
+
+local function isHelperProcess(app, name)
+    if app:kind() ~= 1 then return true end
+    for _, pattern in ipairs(helperPatterns) do
+        if name:find(pattern, 1, true) then return true end
+    end
+    return false
+end
+
+-- Snapshot of already-running apps at startup
+local knownBundleIDs = {}
+for _, app in ipairs(hs.application.runningApplications()) do
+    local bid = app:bundleID()
+    if bid and bid ~= "" then
+        knownBundleIDs[bid] = true
     end
 end
 
--- Global variable reference to prevent garbage collection
-globalAppWatcher = hs.application.watcher.new(appWatcherCallback)
+-- Poll every 300ms for new processes appearing
+globalPollTimer = hs.timer.new(0.3, function()
+    local currentBundleIDs = {}
+
+    for _, app in ipairs(hs.application.runningApplications()) do
+        local bid = app:bundleID()
+        if bid and bid ~= "" then
+            currentBundleIDs[bid] = true
+
+            if not knownBundleIDs[bid] then
+                local appName = app:name()
+                if appName and appName ~= "" and not activeLaunches[appName] and not isHelperProcess(app, appName) then
+                    activeLaunches[appName] = true
+                    updateMenuBar()
+
+                    local deadline = hs.timer.secondsSinceEpoch() + 20
+                    local t = hs.timer.new(0.4, function()
+                        local a = hs.application.get(appName)
+                        if a and (#a:allWindows() > 0 or a:isFrontmost()) then
+                            clearLaunch(appName)
+                        elseif hs.timer.secondsSinceEpoch() > deadline then
+                            clearLaunch(appName)
+                        end
+                    end)
+                    t:start()
+                    launchTimers[appName] = t
+                end
+            end
+        end
+    end
+
+    knownBundleIDs = currentBundleIDs
+end)
+
+globalPollTimer:start()
+
+globalAppWatcher = hs.application.watcher.new(function(appName, eventType, _)
+    if eventType == hs.application.watcher.launched then
+        if activeLaunches[appName] then
+            clearLaunch(appName)
+        end
+    end
+end)
 globalAppWatcher:start()
