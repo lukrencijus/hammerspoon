@@ -479,10 +479,12 @@ globalPollTimer = hs.timer.new(0.3, function()
 
                     local deadline = hs.timer.secondsSinceEpoch() + 20
                     local t = hs.timer.new(0.4, function()
-                        local a = hs.application.get(appName)
-                        if a and (#a:allWindows() > 0 or a:isFrontmost()) then
-                            clearLaunch(appName)
-                        elseif hs.timer.secondsSinceEpoch() > deadline then
+                        local ok, ready = pcall(function()
+                            local a = hs.application.get(appName)
+                            return a and (#a:allWindows() > 0 or a:isFrontmost())
+                        end)
+
+                        if (ok and ready) or hs.timer.secondsSinceEpoch() > deadline then
                             clearLaunch(appName)
                         end
                     end)
