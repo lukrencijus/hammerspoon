@@ -293,7 +293,17 @@ spotify.init()
 -- ==========================
 -- Unsplash Daily Wallpaper
 -- ==========================
-local ACCESS_KEY = "YpVW2DPaq0SziEo0ZHcqTDDiU860wAf9GmalZmIDkqk"
+
+-- Safely require secrets.lua
+local hasSecrets, secrets = pcall(require, "secrets")
+local ACCESS_KEY = hasSecrets and secrets.unsplash_access_key or ""
+
+if ACCESS_KEY == "" then
+  hs.notify.new({
+    title = "Hammerspoon Warning",
+    informativeText = "Unsplash API key is missing from secrets.lua"
+  }):send()
+end
 
 local currentTask = nil
 local lastChangeTime = 0
@@ -326,6 +336,7 @@ local function setWallpaperFromURL(url)
 end
 
 local function fetchRandomFromUnsplash()
+  if ACCESS_KEY == "" then return end
   local http = require("hs.http")
 
   local apiUrl = "https://api.unsplash.com/photos/random?client_id="
