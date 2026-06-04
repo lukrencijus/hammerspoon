@@ -84,12 +84,12 @@ local menubar = nil
 local timer = nil
 local updateInterval = 3
 local lastTrackInfo = nil
-
+ 
 function spotify.init()
     spotify.createMenuBar()
     spotify.startTimer()
 end
-
+ 
 function spotify.createMenuBar()
     if menubar then
         menubar:delete()
@@ -100,7 +100,7 @@ function spotify.createMenuBar()
         return spotify.createMenu()
     end)
 end
-
+ 
 function spotify.isSpotifyRunning()
     local success, result = pcall(function()
         local spotifyApp = hs.application.find("Spotify")
@@ -125,12 +125,12 @@ function spotify.isSpotifyRunning()
         return false
     end
 end
-
+ 
 function spotify.isSpotifyRunningAlternative()
     local result = hs.execute("pgrep -x Spotify")
     return result and result ~= ""
 end
-
+ 
 function spotify.getCurrentTrack()
     if not spotify.isSpotifyRunning() and not spotify.isSpotifyRunningAlternative() then
         return nil
@@ -157,8 +157,15 @@ function spotify.getCurrentTrack()
     local ok, result = hs.osascript.applescript(script)
     if ok and result and result ~= "" then
         local parts = {}
-        for part in string.gmatch(result, "([^||]+)") do
-            table.insert(parts, part)
+        local i = 1
+        while true do
+            local a, b = result:find("||", i, true)
+            if not a then
+                table.insert(parts, result:sub(i))
+                break
+            end
+            table.insert(parts, result:sub(i, a - 1))
+            i = b + 1
         end
         
         if #parts >= 4 then
@@ -172,7 +179,7 @@ function spotify.getCurrentTrack()
     end
     return nil
 end
-
+ 
 function spotify.createMenu()
     local track = spotify.getCurrentTrack()
     if not track then
@@ -239,7 +246,7 @@ function spotify.createMenu()
     
     return menu
 end
-
+ 
 function spotify.updateMenuBarDisplay()
     local success, error = pcall(function()
         if not spotify.isSpotifyRunning() and not spotify.isSpotifyRunningAlternative() then
@@ -270,10 +277,10 @@ function spotify.updateMenuBarDisplay()
         end
         
         local displayText = track.artist .. " - " .. track.title
-        if string.len(displayText) > 45 then
-            displayText = string.sub(displayText, 1, 42) .. "..."
+        if #displayText > 30 then
+            displayText = displayText:sub(1, 27) .. "..."
         end
-        
+ 
         local stateIcon = track.state == "playing" and "" or "⏸"
         menubar:setIcon(nil)
         menubar:setTitle(stateIcon .. " " .. displayText)
@@ -282,7 +289,7 @@ function spotify.updateMenuBarDisplay()
     if not success then
     end
 end
-
+ 
 function spotify.startTimer()
     if timer then
         timer:stop()
@@ -295,7 +302,7 @@ function spotify.startTimer()
     
     spotify.updateMenuBarDisplay()
 end
-
+ 
 function spotify.stop()
     if timer then
         timer:stop()
@@ -306,13 +313,13 @@ function spotify.stop()
         menubar = nil
     end
 end
-
+ 
 function spotify.cleanup()
     spotify.stop()
 end
-
+ 
 hs.shutdownCallback = spotify.cleanup
-
+ 
 spotify.init()
 
 
