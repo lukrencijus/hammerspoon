@@ -384,6 +384,13 @@ scheduleNextCheck()
 -- ==========================
 -- Automatically switch focus to the next available window when a window is minimized
 -- ==========================
+
+-- Prevent window.filter from attempting to watch secure macOS system processes
+hs.window.filter.ignoreAlways["loginwindow"] = true
+hs.window.filter.ignoreAlways["ScreenSaverEngine"] = true
+hs.window.filter.ignoreAlways["Control Centre"] = true
+hs.window.filter.ignoreAlways["WindowManager"] = true
+
 -- Watch for window minimization events
 local wf = hs.window.filter.new()
 wf:subscribe(hs.window.filter.windowMinimized, function()
