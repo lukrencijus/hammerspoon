@@ -411,18 +411,18 @@ local launchMenu = nil
 local launchTimers = {}
 
 local function updateMenuBar()
-    local currentApp = nil
-    for app, _ in pairs(activeLaunches) do
-        currentApp = app
+    local currentAppName = nil
+    for _, appName in pairs(activeLaunches) do
+        currentAppName = appName
         break
     end
 
-    if currentApp then
+    if currentAppName then
         if not launchMenu then
             launchMenu = hs.menubar.new()
         end
-        launchMenu:setTitle("⏳ " .. currentApp)
-        launchMenu:setTooltip("Launching " .. currentApp)
+        launchMenu:setTitle("⏳ " .. currentAppName)
+        launchMenu:setTooltip("Launching " .. currentAppName)
     else
         if launchMenu then
             launchMenu:delete()
@@ -431,11 +431,11 @@ local function updateMenuBar()
     end
 end
 
-local function clearLaunch(appName)
-    activeLaunches[appName] = nil
-    if launchTimers[appName] then
-        launchTimers[appName]:stop()
-        launchTimers[appName] = nil
+local function clearLaunch(bundleID)
+    activeLaunches[bundleID] = nil
+    if launchTimers[bundleID] then
+        launchTimers[bundleID]:stop()
+        launchTimers[bundleID] = nil
     end
     updateMenuBar()
 end
@@ -473,23 +473,26 @@ globalPollTimer = hs.timer.new(0.3, function()
 
             if not knownBundleIDs[bid] then
                 local appName = app:name()
-                if appName and appName ~= "" and not activeLaunches[appName] and not isHelperProcess(app, appName) then
-                    activeLaunches[appName] = true
+                if appName and appName ~= "" and not activeLaunches[bid] and not isHelperProcess(app, appName) then
+                    activeLaunches[bid] = appName
                     updateMenuBar()
 
                     local deadline = hs.timer.secondsSinceEpoch() + 20
+                    local targetBid = bid
+
                     local t = hs.timer.new(0.4, function()
                         local ok, ready = pcall(function()
-                            local a = hs.application.get(appName)
+                            local apps = hs.application.applicationsForBundleID(targetBid)
+                            local a = apps and apps[1]
                             return a and (#a:allWindows() > 0 or a:isFrontmost())
                         end)
 
                         if (ok and ready) or hs.timer.secondsSinceEpoch() > deadline then
-                            clearLaunch(appName)
+                            clearLaunch(targetBid)
                         end
                     end)
                     t:start()
-                    launchTimers[appName] = t
+                    launchTimers[targetBid] = t
                 end
             end
         end
@@ -500,10 +503,11 @@ end)
 
 globalPollTimer:start()
 
-globalAppWatcher = hs.application.watcher.new(function(appName, eventType, _)
-    if eventType == hs.application.watcher.launched then
-        if activeLaunches[appName] then
-            clearLaunch(appName)
+globalAppWatcher = hs.application.watcher.new(function(appName, eventType, appObject)
+    if eventType == hs.application.watcher.launched and appObject then
+        local bid = appObject:bundleID()
+        if bid and activeLaunches[bid] then
+            clearLaunch(bid)
         end
     end
 end)
