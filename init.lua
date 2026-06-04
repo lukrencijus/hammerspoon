@@ -1,29 +1,53 @@
 -- ==========================
+-- Shared helper pattern list (used by Force Quit + Launch Indicator)
+-- ==========================
+local helperPatterns = {
+    "WebView", "Renderer", "Agent", "Daemon", "Extension", "Plugin", "Process", "Content", "Notification", "Desktop",
+}
+
+
+
+-- ==========================
 -- Better Force Quit Applications (with background apps and search functionality)
 -- ==========================
+local forceQuitChooser = nil
+
 hs.hotkey.bind({"cmd", "alt"}, "`", function()
   local apps = hs.application.runningApplications()
   local choices = {}
   for _, app in ipairs(apps) do
     local name = app:name()
     local bundleID = app:bundleID()
-    if app:kind() == 1 then
-      if name and bundleID then
-        table.insert(choices, {
-          text = name,
-          subText = bundleID,
-          app = app,
-          image = hs.image.imageFromAppBundle(bundleID)
-        })
+
+    if name and bundleID then
+      -- Filter helper/extension processes from all apps
+      local isHelper = false
+      for _, pattern in ipairs(helperPatterns) do
+        if name:find(pattern, 1, true) then
+          isHelper = true
+          break
+        end
       end
-    else
-      if name and bundleID and not bundleID:find("^com%.apple%.") then
-        table.insert(choices, {
-          text = name,
-          subText = bundleID,
-          app = app,
-          image = hs.image.imageFromAppBundle(bundleID)
-        })
+
+      if not isHelper then
+        if app:kind() == 1 then
+          table.insert(choices, {
+            text = name,
+            subText = bundleID,
+            app = app,
+            image = hs.image.imageFromAppBundle(bundleID)
+          })
+        else
+          -- Keep non-Apple background apps (menu bar apps, etc.)
+          if not bundleID:find("^com%.apple%.") then
+            table.insert(choices, {
+              text = name,
+              subText = bundleID,
+              app = app,
+              image = hs.image.imageFromAppBundle(bundleID)
+            })
+          end
+        end
       end
     end
   end
@@ -37,14 +61,17 @@ hs.hotkey.bind({"cmd", "alt"}, "`", function()
     end
   end
 
-  local chooser = hs.chooser.new(function(choice)
+  -- Store at module scope to prevent garbage collection before user picks
+  if forceQuitChooser then forceQuitChooser:delete() end
+  forceQuitChooser = hs.chooser.new(function(choice)
+    forceQuitChooser = nil
     if choice and choice.app then
       choice.app:kill()
       hs.alert.show("Quit " .. choice.text)
     end
   end)
-  chooser:choices(uniqueChoices)
-  chooser:show()
+  forceQuitChooser:choices(uniqueChoices)
+  forceQuitChooser:show()
 end)
 
 
@@ -446,11 +473,6 @@ local function clearLaunch(bundleID)
     end
     updateMenuBar()
 end
-
-local helperPatterns = {
-    "WebView", "Helper", "Renderer", "Agent",
-    "Daemon", "Service", "Extension", "Plugin"
-}
 
 local function isHelperProcess(app, name)
     if app:kind() ~= 1 then return true end
