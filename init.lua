@@ -2,7 +2,7 @@
 -- Shared helper pattern list (used by Force Quit + Launch Indicator)
 -- ==========================
 local helperPatterns = {
-    "WebView", "Renderer", "Agent", "Daemon", "Extension", "Plugin", "Process", "Content", "Notification", "Desktop",
+    "WebView", "Renderer", "Agent", "Daemon", "Extension", "Plugin", "Process", "Content", "Notification", "Desktop", "Updater", "Worker",
 }
 
 
@@ -489,62 +489,32 @@ local function isHelperProcess(app, name)
     return false
 end
 
--- Snapshot of already-running apps at startup
-local knownBundleIDs = {}
-for _, app in ipairs(hs.application.runningApplications()) do
-    local bid = app:bundleID()
-    if bid and bid ~= "" then
-        knownBundleIDs[bid] = true
-    end
-end
-
--- Poll every 300ms for new processes appearing
-globalPollTimer = hs.timer.new(0.3, function()
-    local currentBundleIDs = {}
-
-    for _, app in ipairs(hs.application.runningApplications()) do
-        local bid = app:bundleID()
-        if bid and bid ~= "" then
-            currentBundleIDs[bid] = true
-
-            if not knownBundleIDs[bid] then
-                local appName = app:name()
-                if appName and appName ~= "" and not activeLaunches[bid] and not isHelperProcess(app, appName) then
-                    activeLaunches[bid] = appName
-                    updateMenuBar()
-
-                    local deadline = hs.timer.secondsSinceEpoch() + 20
-                    local targetBid = bid
-
-                    local t = hs.timer.new(0.4, function()
-                        local ok, ready = pcall(function()
-                            local apps = hs.application.applicationsForBundleID(targetBid)
-                            local a = apps and apps[1]
-                            return a and (#a:allWindows() > 0 or a:isFrontmost())
-                        end)
-
-                        if (ok and ready) or hs.timer.secondsSinceEpoch() > deadline then
-                            clearLaunch(targetBid)
-                        end
-                    end)
-                    t:start()
-                    launchTimers[targetBid] = t
-                end
-            end
-        end
-    end
-
-    knownBundleIDs = currentBundleIDs
-end)
-
-globalPollTimer:start()
-
 globalAppWatcher = hs.application.watcher.new(function(appName, eventType, appObject)
-    if eventType == hs.application.watcher.launched and appObject then
-        local bid = appObject:bundleID()
-        if bid and activeLaunches[bid] then
+    if eventType ~= hs.application.watcher.launching then return end
+    if not appObject then return end
+
+    local bid  = appObject:bundleID()
+    local name = appObject:name() or appName
+
+    if not bid or not name or name == "" then return end
+    if activeLaunches[bid] then return end
+    if isHelperProcess(appObject, name) then return end
+
+    activeLaunches[bid] = name
+    updateMenuBar()
+
+    local deadline = hs.timer.secondsSinceEpoch() + 20
+    local t = hs.timer.new(0.4, function()
+        local ok, ready = pcall(function()
+            local apps = hs.application.applicationsForBundleID(bid)
+            local a = apps and apps[1]
+            return a and (#a:allWindows() > 0 or a:isFrontmost())
+        end)
+        if (ok and ready) or hs.timer.secondsSinceEpoch() > deadline then
             clearLaunch(bid)
         end
-    end
+    end)
+    t:start()
+    launchTimers[bid] = t
 end)
 globalAppWatcher:start()
