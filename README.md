@@ -1,23 +1,16 @@
 # Better Force Quit Applications 
-(with background apps and search functionality)
 
-This was written because I do not like "task managers" on Mac
+`modules/force_quit.lua`
 
-We have "Force Quit Applications" (cmd + option + esc) but is it very basic and limited
+This was written because I do not like "task managers" on macOS. We have "Force Quit Applications" (cmd + option + esc) but it is very basic and limited. We also have "Activity Monitor" but it takes a while to load. So this script has a customizable hotkey to open it, includes search functionality and also shows background applications.
 
-We also have "Activity Monitor" but it takes a while to load
-
-So this Hammerspoon script has a customizable hotkey to open it, includes search functionality, and also shows background applications
-
-> [!IMPORTANT]
-> The limitation is that some applications have extensions that also show up as applications, but without an icon
-
-![sw 2025-05-29 at 11 58 42](https://github.com/user-attachments/assets/3b829948-ce7d-4df1-8f92-cc5fd1fc069f)
+![sw 2025-05-29 at 11 58 42](https://github.com/user-attachments/assets/6eac12b1-3853-4f22-8412-e5a6c50313cc)
 
 # Spotify in menu bar
-(artist and song names and media controls when clicked)
 
-Hides when Spotify is not open
+`modules/spotify.lua`
+
+This script was written so no third party application would be needed on system. It shows artist and song name, media controls when clicked and hides when Spotify is not open.
 
 ![sw 2025-05-29 at 12 00 06](https://github.com/user-attachments/assets/0b688bf1-609f-441c-832f-f4c16fed560b)
 
@@ -27,17 +20,21 @@ Hides when Spotify is not open
 
 # Unsplash Daily Wallpaper
 
-Automatically updates macOS wallpaper with a random photo from Unsplash
+`modules/wallpaper.lua`
 
-Taken from curated collections ([Wallpapers for macOS](https://unsplash.com/collections/7282015), [Photo of the Day](https://unsplash.com/collections/1459961), [Unsplash Editorial](https://unsplash.com/collections/317099), [Wallpapers](https://unsplash.com/collections/1065976))
-
-Fetches a new wallpaper every 20 hours
-
-Applies to all connected displays
-
-Deletes wallpaper files automatically
+Sometimes it just becomes boring to look at the same wallpaper. This script automatically updates macOS wallpaper with a random photo from Unsplash. Fetches a new wallpaper every 20 hours. Applies to all connected displays. Deletes wallpaper files automatically. Taken from curated collections ([Wallpapers for macOS](https://unsplash.com/collections/7282015), [Photo of the Day](https://unsplash.com/collections/1459961), [Unsplash Editorial](https://unsplash.com/collections/317099), [Wallpapers](https://unsplash.com/collections/1065976)).
 
 > [!IMPORTANT]
-> Add [Unsplash API Access Key](https://unsplash.com/developers) to the script
+> Add [Unsplash API Access Key](https://unsplash.com/developers) to the `secrets.lua`
 
-![sw](https://github.com/user-attachments/assets/f2ad8280-2cb6-408e-90bc-eb142545882f)
+# Automatic Window Focus Switcher
+
+`modules/window_focus.lua`
+
+On macOS when you minimize an application window it does not automatically cycle your active focus to another window, so when you minimize a window, this script retrieves all other open windows and immediately shifts focus to the next available visible window.
+
+# Menu Bar App Launch Indicator
+
+`modules/launch_indicator.lua`
+
+On macOS if you hide your dock and launch applications using keyboard shortcuts, it can sometimes feel unresponsive, you press a hotkey but nothing happens, forcing you to hover your mouse over the screen edge to check if the application is actually loading, so this script displays a temporary loading icon and the application's name in macOS menu bar.
