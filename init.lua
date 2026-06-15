@@ -488,9 +488,20 @@ local function clearLaunch(bundleID)
 end
 
 local function isHelperProcess(app, name)
+    -- Treat non-standard/background UI processes as helpers right away
     if app:kind() ~= 1 then return true end
+    
+    local bid = app:bundleID()
+    
+    -- Safeguard and normalize inputs to lowercase
+    local lowerName = name and name:lower() or ""
+    local lowerBid = bid and bid:lower() or ""
+
     for _, pattern in ipairs(helperPatterns) do
-        if name:find(pattern, 1, true) then return true end
+        local lowerPattern = pattern:lower()
+        if lowerName:find(lowerPattern, 1, true) or lowerBid:find(lowerPattern, 1, true) then
+            return true
+        end
     end
     return false
 end
