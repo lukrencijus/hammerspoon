@@ -2,7 +2,7 @@
 -- Shared helper pattern list (used by Force Quit + Launch Indicator)
 -- ==========================
 local helperPatterns = {
-    "WebView", "Renderer", "Agent", "Daemon", "Extension", "Plugin", "Process", "Content", "Notification", "Desktop", "Updater", "Worker",
+  "webview", "renderer", "agent", "daemon", "extension", "plugin", "process", "content", "notification", "desktop", "updater", "worker",
 }
 
 
@@ -15,15 +15,21 @@ local forceQuitChooser = nil
 hs.hotkey.bind({"cmd", "alt"}, "`", function()
   local apps = hs.application.runningApplications()
   local choices = {}
+  
   for _, app in ipairs(apps) do
     local name = app:name()
     local bundleID = app:bundleID()
 
     if name and bundleID then
+      -- Convert to lowercase for robust, case-insensitive matching
+      local lowerName = name:lower()
+      local lowerBundle = bundleID:lower()
+
       -- Filter helper/extension processes from all apps
       local isHelper = false
       for _, pattern in ipairs(helperPatterns) do
-        if name:find(pattern, 1, true) then
+        local lowerPattern = pattern:lower()
+        if lowerName:find(lowerPattern, 1, true) or lowerBundle:find(lowerPattern, 1, true) then
           isHelper = true
           break
         end
