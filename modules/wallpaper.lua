@@ -8,6 +8,9 @@ local currentTask = nil
 local lastChangeTime = 0
 local nextCheckTimer = nil
 
+local UPDATE_INTERVAL_HOURS = 20
+local RETRY_AFTER_FAILURE_MINUTES = 15
+
 local function setWallpaperFromURL(url)
   if currentTask then
     currentTask:terminate()
@@ -35,44 +38,57 @@ local function setWallpaperFromURL(url)
   currentTask:start()
 end
 
+function wallpaper.scheduleNextCheck(secondsFromNow)
+  if nextCheckTimer then
+    nextCheckTimer:stop()
+  end
+
+  local delay = secondsFromNow
+  if not delay then
+    local secondsUntilDue = (lastChangeTime + UPDATE_INTERVAL_HOURS * 3600) - os.time()
+    delay = math.max(60, secondsUntilDue)
+  end
+
+  nextCheckTimer = hs.timer.doAfter(delay, wallpaper.checkAndUpdateWallpaper)
+end
+
 local function fetchRandomFromUnsplash()
   if ACCESS_KEY == "" then return end
-  local http = require("hs.http")
 
   local apiUrl = "https://api.unsplash.com/photos/random?client_id="
     .. ACCESS_KEY
     .. "&collections=1065976,317099,1459961,7282015"
     .. "&orientation=landscape"
 
-  http.asyncGet(apiUrl, nil, function(status, body)
+  hs.http.asyncGet(apiUrl, nil, function(status, body)
+    local ok = false
+
     if status == 200 then
       local data = hs.json.decode(body)
       if data and data.urls and data.urls.full then
         setWallpaperFromURL(data.urls.full)
         lastChangeTime = os.time()
-        wallpaper.scheduleNextCheck()
+        ok = true
       end
+    end
+
+    if ok then
+      wallpaper.scheduleNextCheck()
+    else
+      hs.logger.new("wallpaper"):w("Unsplash fetch failed (status: " .. tostring(status) .. "), retrying in " .. RETRY_AFTER_FAILURE_MINUTES .. " min")
+      wallpaper.scheduleNextCheck(RETRY_AFTER_FAILURE_MINUTES * 60)
     end
   end)
 end
 
-local function checkAndUpdateWallpaper()
-  local currentTime = os.time()
-  local hoursSinceLastChange = (currentTime - lastChangeTime) / 3600
+function wallpaper.checkAndUpdateWallpaper()
+  local hoursSinceLastChange = (os.time() - lastChangeTime) / 3600
 
-  if hoursSinceLastChange >= 20 then
+  if hoursSinceLastChange >= UPDATE_INTERVAL_HOURS then
     fetchRandomFromUnsplash()
   else
     wallpaper.scheduleNextCheck()
   end
-end
-
-function wallpaper.scheduleNextCheck()
-  if nextCheckTimer then
-    nextCheckTimer:stop()
-  end
-
-  nextCheckTimer = hs.timer.doAfter(60, checkAndUpdateWallpaper)
 end
 
 function wallpaper.init()
@@ -83,7 +99,8 @@ function wallpaper.init()
     }):send()
     return
   end
-  wallpaper.scheduleNextCheck()
+
+  wallpaper.checkAndUpdateWallpaper()
 end
 
 return wallpaper
