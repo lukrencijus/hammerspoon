@@ -16,6 +16,7 @@ local launchIndicator = require("launch_indicator")
 forceQuit.init()
 spotify.init()
 wallpaper.init()
+wallpaper.forceUpdate()
 windowFocus.init()
 launchIndicator.init()
 

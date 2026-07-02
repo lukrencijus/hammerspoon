@@ -5,11 +5,21 @@ local hasSecrets, secrets = pcall(require, "secrets")
 local ACCESS_KEY = hasSecrets and secrets.unsplash_access_key or ""
 
 local currentTask = nil
-local lastChangeTime = 0
 local nextCheckTimer = nil
+local caffeinateWatcher = nil
 
 local UPDATE_INTERVAL_HOURS = 20
 local RETRY_AFTER_FAILURE_MINUTES = 15
+local CHECK_INTERVAL_MINUTES = 30
+local SETTINGS_KEY = "wallpaper.lastChangeTime"
+
+local function getLastChangeTime()
+  return hs.settings.get(SETTINGS_KEY) or 0
+end
+
+local function setLastChangeTime(t)
+  hs.settings.set(SETTINGS_KEY, t)
+end
 
 local function setWallpaperFromURL(url)
   if currentTask then
@@ -38,18 +48,13 @@ local function setWallpaperFromURL(url)
   currentTask:start()
 end
 
-function wallpaper.scheduleNextCheck(secondsFromNow)
+function wallpaper.scheduleNextCheck(overrideMinutes)
   if nextCheckTimer then
     nextCheckTimer:stop()
   end
 
-  local delay = secondsFromNow
-  if not delay then
-    local secondsUntilDue = (lastChangeTime + UPDATE_INTERVAL_HOURS * 3600) - os.time()
-    delay = math.max(60, secondsUntilDue)
-  end
-
-  nextCheckTimer = hs.timer.doAfter(delay, wallpaper.checkAndUpdateWallpaper)
+  local delaySeconds = (overrideMinutes or CHECK_INTERVAL_MINUTES) * 60
+  nextCheckTimer = hs.timer.doAfter(delaySeconds, wallpaper.checkAndUpdateWallpaper)
 end
 
 local function fetchRandomFromUnsplash()
@@ -67,7 +72,7 @@ local function fetchRandomFromUnsplash()
       local data = hs.json.decode(body)
       if data and data.urls and data.urls.full then
         setWallpaperFromURL(data.urls.full)
-        lastChangeTime = os.time()
+        setLastChangeTime(os.time())
         ok = true
       end
     end
@@ -76,19 +81,23 @@ local function fetchRandomFromUnsplash()
       wallpaper.scheduleNextCheck()
     else
       hs.logger.new("wallpaper"):w("Unsplash fetch failed (status: " .. tostring(status) .. "), retrying in " .. RETRY_AFTER_FAILURE_MINUTES .. " min")
-      wallpaper.scheduleNextCheck(RETRY_AFTER_FAILURE_MINUTES * 60)
+      wallpaper.scheduleNextCheck(RETRY_AFTER_FAILURE_MINUTES)
     end
   end)
 end
 
 function wallpaper.checkAndUpdateWallpaper()
-  local hoursSinceLastChange = (os.time() - lastChangeTime) / 3600
+  local hoursSinceLastChange = (os.time() - getLastChangeTime()) / 3600
 
   if hoursSinceLastChange >= UPDATE_INTERVAL_HOURS then
     fetchRandomFromUnsplash()
   else
     wallpaper.scheduleNextCheck()
   end
+end
+
+function wallpaper.forceUpdate()
+  fetchRandomFromUnsplash()
 end
 
 function wallpaper.init()
@@ -99,6 +108,16 @@ function wallpaper.init()
     }):send()
     return
   end
+
+  if caffeinateWatcher then
+    caffeinateWatcher:stop()
+  end
+  caffeinateWatcher = hs.caffeinate.watcher.new(function(eventType)
+    if eventType == hs.caffeinate.watcher.systemDidWake then
+      wallpaper.checkAndUpdateWallpaper()
+    end
+  end)
+  caffeinateWatcher:start()
 
   wallpaper.checkAndUpdateWallpaper()
 end
